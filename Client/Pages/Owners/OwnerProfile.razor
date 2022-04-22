@@ -1,0 +1,74 @@
+@page "/owners/profile"
+@page "/owners/profile/{ID}"
+
+@inject HttpClient httpClient
+@inject IJSRuntime jsRuntime
+@inject NavigationManager navigationManager
+
+<style @scoped>
+    .btn-close {
+        left: 0.15rem;
+    }
+
+    .profile-card {
+        background-color: #f7f7f7;
+        border-radius: 0.5rem;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        margin-bottom: 2rem;
+        padding: 1rem;
+    }
+</style>
+
+<section class="title-section">
+    <h3>Pérfil de usuario</h3>
+    <button class="btn btn-sm btn-success" @onclick="Edit">Actualizar</button>
+</section>
+<hr />
+
+<section class="profile-card">
+    <aside>
+        @Owner.Name
+    </aside>
+    <aside>
+        @Owner.LastName
+    </aside>
+    <aside>
+        @Owner.Phone
+    </aside>
+    <aside>
+        @Owner.Email
+    </aside>
+</section>
+
+<PetList ID=@ID />
+
+@code {
+    [Parameter]
+    public string ID { get; set; }
+    private OwnerDto Owner { get; set; }
+
+    public OwnerProfile()
+    {
+        ID = string.Empty;
+        Owner = new OwnerDto();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInitialValues();
+    }
+
+    private void Edit()
+    {
+        navigationManager.NavigateTo($"/owners/edit/{ID}");
+    }
+
+    private async Task LoadInitialValues()
+    {
+        var response = await httpClient.GetFromJsonAsync<IEnumerable<OwnerDto>>($"api/owners/{ID}");
+
+        Owner = response?.FirstOrDefault() ?? new OwnerDto();
+    }
+}

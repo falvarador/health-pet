@@ -1,0 +1,93 @@
+@page "/owners/add/{ID}"
+@page "/owners/edit/{ID}"
+
+@inject HttpClient httpClient
+@inject NavigationManager navigationManager
+@layout EmptyLayout
+
+<EditForm Model="Owner" OnValidSubmit="SubmitForm">
+    <section class="title-section">
+        <h3>Datos del propietario</h3>
+        <button class="btn btn-sm btn-success" type="submit">
+            @(Owner.OwnerId == 0 ? "Agregar" : "Editar")
+        </button>
+    </section>
+    <hr />
+
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <aside class="mb-3">
+        <label for="ID" class="form-label">ID</label>
+        <input autocomplete="off" type="text" class="form-control" id="ID" readonly @bind="Owner.ID" />
+    </aside>
+    <div class="mb-3">
+        <label for="name" class="form-label">Nombre</label>
+        <input autocomplete="off" type="text" class="form-control" id="name" @bind="Owner.Name" />
+    </div>
+    <div class="mb-3">
+        <label for="last-name" class="form-label">Apellidos</label>
+        <input autocomplete="off" type="text" class="form-control" id="last-name" @bind="Owner.LastName" />
+    </div>
+    <aside class="mb-3">
+        <label for="phone" class="form-label">Número de teléfono</label>
+        <input autocomplete="off" type="text" class="form-control" id="phone" @bind="Owner.Phone" />
+    </aside>
+    <aside class="mb-3">
+        <label for="email" class="form-label">Correo electrónico</label>
+        <input autocomplete="off" type="email" class="form-control" id="email" @bind="Owner.Email" />
+    </aside>
+</EditForm>
+
+@code {
+    [Parameter]
+    public string ID { get; set; }
+    private OwnerDto Owner { get; set; }
+
+    public OwnerForm()
+    {
+        ID = string.Empty;
+        Owner = new OwnerDto();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInitialValues();
+    }
+
+    public async Task SubmitForm()
+    {
+        if (string.IsNullOrEmpty(Owner.Name))
+            await Add();
+        else
+            await Edit();
+    }
+
+    private async Task Add()
+    {
+        var response = await httpClient.PostAsJsonAsync("api/owners", Owner);
+        if (response.IsSuccessStatusCode)
+        {
+            await response.Content.ReadAsStringAsync();
+            navigationManager.NavigateTo($"/pets/add/{ID}");
+        }
+    }
+
+    private async Task Edit()
+    {
+        var response = await httpClient.PutAsJsonAsync($"api/owners/{ID}", Owner);
+        if (response.IsSuccessStatusCode)
+        {
+            await response.Content.ReadAsStringAsync();
+            navigationManager.NavigateTo($"/owners/profile/{ID}");
+        }
+    }
+
+    private async Task LoadInitialValues()
+    {
+        var response = await httpClient
+        .GetFromJsonAsync<IEnumerable<OwnerDto>>($"api/owners/{ID}");
+
+        Owner = response?.FirstOrDefault() ?? new OwnerDto { ID = ID };
+    }
+}

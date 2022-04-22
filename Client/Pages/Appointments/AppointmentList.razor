@@ -1,0 +1,90 @@
+@page "/appointments/{ID}"
+
+@inject HttpClient httpClient
+@inject IJSRuntime jsRuntime
+@inject NavigationManager navigationManager
+
+<section class="title-section">
+    <h3>Mis citas</h3>
+    <button class="btn btn-sm btn-success" @onclick="Schedule">Agendar cita</button>
+</section>
+<hr />
+
+<table class="table">
+    <thead>
+        <tr>
+            <th scope="col">Tipo de consulta</th>
+            <th scope="col">Hora</th>
+            <th scope="col">Fecha</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (!Appointments.Any())
+        {
+            <text>No existen registros que mostrar.</text>
+        }
+        else
+        {
+            @foreach (var appointment in Appointments)
+            {
+                <tr>
+                    <td>@appointment.CategoryDescription</td>
+                    <td>@appointment.Hour.ToFormatDisplaySchedule()</td>
+                    <td>@appointment.Date.ToString("dd/MM/yyyy")</td>
+                    <td>@AppointmentState.ToFormatStateName(appointment.State)</td>
+                    <td>
+                        <span class="icon fa-solid fa-ban" aria-hidden="true"
+                        @onclick=@(() => Cancel(appointment.AppointmentId))></span>
+                        <span class="icon fa-solid fa-pencil" aria-hidden="true"
+                        @onclick=@(() => Edit(appointment.AppointmentId))></span>
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@code {
+    [Parameter]
+    public string ID { get; set; }
+
+    public AppointmentList()
+    {
+        ID = string.Empty;
+        Appointments = new List<AppointmentWithDescriptionDto>();
+    }
+
+    private IEnumerable<AppointmentWithDescriptionDto> Appointments { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInitialValues();
+    }
+
+    private void Schedule()
+    {
+        navigationManager.NavigateTo($"/appointments/schedule/{ID}");
+    }
+
+    private void Edit(int id)
+    {
+        navigationManager.NavigateTo($"/appointments/edit/{ID}/{id}");
+    }
+
+    private async Task Cancel(int id)
+    {
+        if (!await jsRuntime.Confirm("¿Está seguro de cancelar la cita?"))
+            return;
+
+        await httpClient.DeleteAsync($"api/appointments/{id}");
+        await LoadInitialValues();
+    }
+
+    private async Task LoadInitialValues()
+    {
+        Appointments = await httpClient.GetFromJsonAsync<IEnumerable<AppointmentWithDescriptionDto>>($"api/owners/{ID}/appointments")
+        ?? Enumerable.Empty<AppointmentWithDescriptionDto>();
+    }
+}

@@ -1,0 +1,55 @@
+﻿@inject HttpClient httpClient
+@inject IJSRuntime jsRuntime
+@inject NavigationManager navigationManager
+
+<EditForm Model="SearchById" OnValidSubmit="SubmitForm">
+    <section class="title-section">
+        <h3>Búsqueda de propietarios</h3>
+    </section>
+    <hr />
+
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <aside class="mb-3">
+        <label for="ID" class="form-label">Número de identificación:</label>
+        <input autocomplete="off" type="text" class="form-control" id="ID" @bind="SearchById.ID">
+    </aside>
+
+    <button class="btn btn-sm btn-success" type="submit">Buscar</button>
+</EditForm>
+
+@code {
+    private Owner Owner { get; set; }
+    private SearchByIdDto SearchById { get; set; }
+
+    public SearchOwnerByID()
+    {
+        Owner = new Owner();
+        SearchById = new SearchByIdDto();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await jsRuntime.RemoveFromLocalStorage("ownerID");
+    }
+
+    private async Task SubmitForm()
+    {
+        await Search();
+    }
+
+    private async Task Search()
+    {
+        var response = await httpClient.GetFromJsonAsync<IEnumerable<Owner>>($"api/owners/{SearchById.ID}");
+
+        Owner = response?.FirstOrDefault() ?? new Owner();
+
+        await jsRuntime.SetInLocalStorage("ownerID", SearchById.ID);
+
+        if (string.IsNullOrEmpty(Owner.ID))
+            navigationManager.NavigateTo($"/owners/add/{SearchById.ID}");
+        else
+            navigationManager.NavigateTo($"/owners/profile/{Owner.ID}");
+    }
+}

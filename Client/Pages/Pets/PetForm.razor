@@ -1,0 +1,114 @@
+@page "/pets/add/{ID}"
+@page "/pets/edit/{ID}/{petId}"
+
+@inject HttpClient httpClient
+@inject NavigationManager navigationManager
+@layout EmptyLayout
+
+<EditForm Model="Pet" OnValidSubmit="SubmitForm">
+    <section class="title-section">
+        <h3>Datos de tu mascota</h3>
+        <button class="btn btn-sm btn-success" type="submit">
+            @(string.IsNullOrEmpty(petId) ? "Agregar" : "Editar")
+        </button>
+    </section>
+    <hr />
+
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <aside class="mb-3">
+        <label for="pet-type" class="form-label">Tipo de mascota</label>
+        <InputSelect class="form-select" id="pet-type" aria-label="Pet type select" @bind-Value="Pet.PetTypeId">
+            <option value=null>Selecciona una opción</option>
+            @foreach (var petType in PetTypes)
+            {
+                <option value="@petType.PetTypeId">@petType.Description</option>
+            }
+        </InputSelect>
+    </aside>
+    <div class="mb-3">
+        <label for="name" class="form-label">Nombre</label>
+        <input autocomplete="off" type="text" class="form-control" id="name" @bind="Pet.Name" />
+    </div>
+    <div class="mb-3">
+        <label for="age" class="form-label">Edad</label>
+        <input autocomplete="off" type="number" class="form-control" id="age" @bind="Pet.Age" />
+    </div>
+    <aside class="mb-3">
+        <label for="breed" class="form-label">Raza</label>
+        <input autocomplete="off" type="text" class="form-control" id="breed" @bind="Pet.Breed" />
+    </aside>
+</EditForm>
+
+@code {
+    [Parameter]
+    public string ID { get; set; }
+    [Parameter]
+    public string petId { get; set; }
+    private PetDto Pet { get; set; }
+    private IEnumerable<PetType> PetTypes { get; set; }
+
+    public PetForm()
+    {
+        ID = string.Empty;
+        petId = string.Empty;
+        Pet = new PetDto();
+        PetTypes = new List<PetType>();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInitialValues();
+
+        if (!string.IsNullOrEmpty(petId))
+        {
+            await LoadInitialValues(petId);
+        }
+        else
+        {
+            Pet.IDOwner = ID;
+        }
+    }
+
+    public async Task SubmitForm()
+    {
+        if (string.IsNullOrEmpty(petId))
+            await Add();
+        else
+            await Edit(petId);
+    }
+
+    private async Task Add()
+    {
+        var response = await httpClient.PostAsJsonAsync("api/pets", Pet);
+        if (response.IsSuccessStatusCode)
+        {
+            await response.Content.ReadAsStringAsync();
+            navigationManager.NavigateTo($"/owners/profile/{ID}");
+        }
+    }
+
+    private async Task Edit(string id)
+    {
+        var response = await httpClient.PutAsJsonAsync($"api/pets/{id}", Pet);
+        if (response.IsSuccessStatusCode)
+        {
+            await response.Content.ReadAsStringAsync();
+            navigationManager.NavigateTo($"/owners/profile/{ID}");
+        }
+    }
+
+    private async Task LoadInitialValues()
+    {
+        PetTypes = await httpClient.GetFromJsonAsync<IEnumerable<PetType>>("api/pet-types")
+        ?? Enumerable.Empty<PetType>();
+    }
+
+    private async Task LoadInitialValues(string id)
+    {
+        var response = await httpClient.GetFromJsonAsync<PetDto>($"api/pets/{id}");
+
+        Pet = response ?? new PetDto();
+    }
+}

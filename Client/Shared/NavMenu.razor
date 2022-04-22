@@ -1,0 +1,51 @@
+﻿@inject IJSRuntime jsRuntime
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="@ownerProfileUri">Health Pet</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="@ownerProfileUri">
+                <span class="oi oi-home" aria-hidden="true"></span> Pérfil de usuario
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="@appointmentUri">
+                <span class="oi oi-plus" aria-hidden="true"></span> Reserva de citas
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu;
+    private string appointmentUri { get; set; }
+    private string ownerProfileUri { get; set; }
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    public NavMenu()
+    {
+        collapseNavMenu = true;
+        appointmentUri = string.Empty;
+        ownerProfileUri = string.Empty;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var ownerID = await jsRuntime.GetFromLocalStorage("ownerID");
+        ownerProfileUri = $"owners/profile/{ownerID}";
+        appointmentUri = $"appointments/{ownerID}";
+    }
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

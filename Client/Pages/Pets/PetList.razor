@@ -1,0 +1,85 @@
+@inject HttpClient httpClient
+@inject IJSRuntime jsRuntime
+@inject NavigationManager navigationManager
+
+<section class="title-section">
+    <h3>Mis mascotas</h3>
+    <button class="btn btn-sm btn-success" @onclick="Add">Nueva mascota</button>
+</section>
+<hr />
+
+<table class="table">
+    <thead>
+        <tr>
+            <th scope="col">Tipo de mascota</th>
+            <th scope="col">Nombre</th>
+            <th scope="col">Edad</th>
+            <th scope="col">Raza</th>
+            <th scope="col">Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (!Pets.Any())
+        {
+            <text>No existen registros que mostrar.</text>
+        }
+        else
+        {
+            @foreach (var pet in Pets)
+            {
+                <tr>
+                    <td>@pet.PetTypeDescription</td>
+                    <td>@pet.Name</td>
+                    <td>@pet.Age</td>
+                    <td>@pet.Breed</td>
+                    <td>
+                        <span class="icon fa-solid fa-trash-can" aria-hidden="true" @onclick=@(() => Delete(pet.PetId))></span>
+                        <span class="icon fa-solid fa-pencil" aria-hidden="true" @onclick=@(() => Edit(pet.PetId))></span>
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@code {
+    [Parameter]
+    public string ID { get; set; }
+    private IEnumerable<PetWithDescriptionDto> Pets { get; set; }
+
+    public PetList()
+    {
+        ID = string.Empty;
+        Pets = new List<PetWithDescriptionDto>();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInitialValues();
+    }
+
+    private void Add()
+    {
+        navigationManager.NavigateTo($"/pets/add/{ID}");
+    }
+
+    private void Edit(int id)
+    {
+        navigationManager.NavigateTo($"/pets/edit/{ID}/{id}");
+    }
+
+    private async Task Delete(int id)
+    {
+        if (!await jsRuntime.Confirm("¿Está seguro de eliminar la mascota?"))
+            return;
+
+        await httpClient.DeleteAsync($"api/pets/{ID}/{id}");
+        await LoadInitialValues();
+    }
+
+    private async Task LoadInitialValues()
+    {
+        Pets = await httpClient.GetFromJsonAsync<IEnumerable<PetWithDescriptionDto>>($"api/owners/{ID}/pets")
+        ?? Enumerable.Empty<PetWithDescriptionDto>();
+    }
+}

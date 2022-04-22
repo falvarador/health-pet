@@ -1,0 +1,192 @@
+@page "/appointments/schedule/{ID}"
+@page "/appointments/edit/{ID}/{appointmentId}"
+
+@inject HttpClient httpClient
+@inject IJSRuntime JSRuntime
+@inject NavigationManager navigationManager
+
+@layout EmptyLayout
+
+<EditForm Model="Appointment" OnValidSubmit="SubmitForm">
+    <section class="title-section">
+        <h3>Datos de tu cita</h3>
+        <button class="btn btn-sm btn-success" type="submit">
+            @(string.IsNullOrEmpty(appointmentId) ? "Agregar" : "Editar")
+        </button>
+    </section>
+    <hr />
+
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <aside class="mb-3">
+        <label for="category" class="form-label">Tipo de consulta</label>
+        <InputSelect class="form-select" id="category" aria-label="Category select"
+            @bind-Value="Appointment.CategoryId">
+            <option value=null>Selecciona una opción</option>
+            @foreach (var category in Categories)
+            {
+                <option value="@category.CategoryId">@category.Description</option>
+            }
+        </InputSelect>
+    </aside>
+    <aside class="mb-3">
+        <label for="pet" class="form-label">Mascota</label>
+        <InputSelect class="form-select" id="pet" aria-label="Pets select" @bind-Value="Appointment.PetId">
+            <option value=null>Selecciona una opción</option>
+            @foreach (var pet in Pets)
+            {
+                <option value="@pet.PetId">@pet.Name - @pet.Breed</option>
+            }
+        </InputSelect>
+    </aside>
+    <aside class="mb-3">
+        <label for="date" class="form-label">Fecha</label>
+        <InputSelect class="form-select" id="date" aria-label="Available dates select"
+            ValueChanged="@((DateTime date) => ChangeAvailableSchedule(date))"
+            ValueExpression="@(() => Appointment.Date)" Value="Appointment.Date">
+            @foreach (var date in AvailableDates)
+            {
+                <option value="@date">@date.ToLongDateString()</option>
+            }
+        </InputSelect>
+    </aside>
+    <aside class="mb-3">
+        <label for="hour" class="form-label">Hora</label>
+        <InputSelect class="form-select" id="hour" aria-label="Available schedules select"
+            @bind-Value="Appointment.Hour">
+            @foreach (var schedule in AvailableSchedules)
+            {
+                <option value="@schedule.Schedule">@schedule.Schedule.ToFormatDisplaySchedule()</option>
+            }
+        </InputSelect>
+    </aside>
+</EditForm>
+
+@code {
+    [Parameter]
+    public string ID { get; set; }
+    [Parameter]
+    public string appointmentId { get; set; }
+
+    private AppointmentDto Appointment { get; set; }
+    private IEnumerable<Category> Categories { get; set; }
+    private IEnumerable<DateTime> AvailableDates { get; set; }
+    private IEnumerable<PetWithDescriptionDto> Pets { get; set; }
+    private IEnumerable<ScheduleDto> AvailableSchedules { get; set; }
+
+    public AppointmentForm()
+    {
+        ID = string.Empty;
+        appointmentId = string.Empty;
+
+        Appointment = new AppointmentDto();
+        AvailableDates = new List<DateTime>();
+        AvailableSchedules = new List<ScheduleDto>();
+        Categories = new List<Category>();
+        Pets = new List<PetWithDescriptionDto>();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadAvailableDates();
+        await LoadInitialValues();
+        await LoadAvailableSchedules(Appointment.Date);
+
+        if (!string.IsNullOrEmpty(appointmentId))
+        {
+            await LoadInitialValues(appointmentId);
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        Appointment.IDOwner = ID;
+    }
+
+    public async Task SubmitForm()
+    {
+        if (string.IsNullOrEmpty(appointmentId))
+            await Add();
+        else
+            await Edit(appointmentId);
+    }
+
+    private async Task Add()
+    {
+        var response = await httpClient.PostAsJsonAsync("api/appointments", Appointment);
+        if (response.IsSuccessStatusCode)
+        {
+            var appointment = await response.Content.ReadFromJsonAsync<Appointment>();
+            await JSRuntime.InvokeVoidAsync("openFile", new
+            {
+                fileName = "health-pet",
+                url = $"api/vouchers/{appointment?.AppointmentId}"
+            });
+
+            navigationManager.NavigateTo($"/appointments/{ID}");
+        }
+    }
+
+    private async Task Edit(string id)
+    {
+        var response = await httpClient.PutAsJsonAsync($"api/appointments/{id}", Appointment);
+        if (response.IsSuccessStatusCode)
+        {
+            var appointment = await response.Content.ReadFromJsonAsync<Appointment>();
+            await JSRuntime.InvokeVoidAsync("openFile", new
+            {
+                fileName = "health-pet",
+                url = $"api/vouchers/{appointment?.AppointmentId}"
+            });
+
+            navigationManager.NavigateTo($"/appointments/{ID}");
+        }
+    }
+
+    private async Task ChangeAvailableSchedule(DateTime date)
+    {
+        Appointment.Date = date;
+        await LoadAvailableSchedules(date);
+
+        StateHasChanged();
+    }
+
+    private async Task LoadInitialValues()
+    {
+        Categories = await httpClient.GetFromJsonAsync<IEnumerable<Category>>("api/categories")
+        ?? Enumerable.Empty<Category>();
+
+        Pets = await httpClient.GetFromJsonAsync<IEnumerable<PetWithDescriptionDto>>($"api/owners/{ID}/pets")
+        ?? Enumerable.Empty<PetWithDescriptionDto>();
+    }
+
+    private async Task LoadInitialValues(string id)
+    {
+        var response = await httpClient.GetFromJsonAsync<AppointmentDto>($"api/appointments/{id}");
+
+        Appointment = response ?? new AppointmentDto();
+    }
+
+    private void LoadAvailableDates()
+    {
+        var initialDate = DateTime.Today;
+        var numberOfDays = DateTime.DaysInMonth(initialDate.Year, initialDate.Month);
+
+        var availableDates = Enumerable.Range(0, numberOfDays)
+        .Select(offset => initialDate.AddDays(offset))
+        .Where(date => date.DayOfWeek != DayOfWeek.Saturday
+        && date.DayOfWeek != DayOfWeek.Sunday);
+
+        Appointment.Date = availableDates.FirstOrDefault();
+        AvailableDates = availableDates;
+    }
+
+    private async Task LoadAvailableSchedules(DateTime date)
+    {
+        var response = await
+        httpClient.GetFromJsonAsync<IEnumerable<ScheduleDto>>($"api/appointments/schedules/{date.ToInvariantCulture()}");
+
+        AvailableSchedules = response ?? Enumerable.Empty<ScheduleDto>();
+    }
+}
